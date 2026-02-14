@@ -13,9 +13,9 @@
   const TICK_MS = 1000;
 
   const USERS = [
-    { id: "U001", name: "Amina Desta", role: "Admin" },
-    { id: "U002", name: "Solomon Bekele", role: "Operator" },
-    { id: "U003", name: "Lulit Tesfaye", role: "Viewer" }
+    { id: "U001", name: "Awaiz Ahmed", role: "Admin" },
+    { id: "U002", name: "Omar", role: "Operator" },
+    { id: "U003", name: "Anas", role: "Viewer" }
   ];
 
   const TYPES = [
@@ -943,12 +943,20 @@
     const key = t.getAttribute("data-demo-toggle");
     const val = !!t.checked;
     state.flags[key] = val;
+    const i = activeIncident();
 
-    if (key === "faceRecognized" && val) faceHit();
+    if (key === "faceRecognized" && val) {
+      faceHit();
+      if (i) i.timeline.push({ time: Date.now(), status: i.status, note: "Face recognition toggle enabled for active watch." });
+    }
 
     if (key === "motionDetected") {
       state.drones.forEach((d) => (d.sensors.motion = val));
       log("sensor", `Motion detection ${val ? "enabled" : "cleared"}.`);
+      if (i) {
+        i.timeline.push({ time: Date.now(), status: i.status, note: `Motion detection ${val ? "enabled" : "cleared"} by operator.` });
+        transcript(i.id, `Motion detection ${val ? "ACTIVE" : "cleared"} on drone sensor channel.`, "Sensor Bus", false);
+      }
     }
 
     if (key === "highHeat") {
@@ -957,6 +965,10 @@
       });
       state.drones.forEach((d) => (d.sensors.temp = val ? Math.max(d.sensors.temp, 79) : Math.min(d.sensors.temp, 42)));
       log("sensor", `Heat profile ${val ? "elevated" : "normalized"}.`);
+      if (i) {
+        i.timeline.push({ time: Date.now(), status: i.status, note: `Heat profile ${val ? "elevated" : "normalized"} by demo control.` });
+        transcript(i.id, `Thermal channel ${val ? "spike detected" : "returned to nominal range"}.`, "Thermal", false);
+      }
     }
 
     if (key === "networkDegraded") {
@@ -964,6 +976,10 @@
       else {
         resolveAnomaly("network-degraded");
         log("security", "Network status recovered to stable.");
+      }
+      if (i) {
+        i.timeline.push({ time: Date.now(), status: i.status, note: `Network ${val ? "degraded" : "stabilized"}; secure channel ${val ? "fallback active" : "restored"}.` });
+        transcript(i.id, `Network status ${val ? "DEGRADED" : "stable"} for command uplink.`, "Network", false);
       }
     }
 
