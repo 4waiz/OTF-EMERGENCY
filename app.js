@@ -129,7 +129,9 @@
     incidentFilter: "All",
     selectedIncidentId: state.incidents[0] ? state.incidents[0].id : null,
     autoScenarioRunning: false,
-    aiPlanExpanded: false
+    aiPlanExpanded: false,
+    tutorialOpen: false,
+    tutorialStep: 0
   };
 
   let mapState = {
@@ -357,6 +359,8 @@
 
     if (route.path === "/login") {
       destroyMap();
+      ui.tutorialOpen = false;
+      ui.tutorialStep = 0;
       app.innerHTML = renderLoginView();
       bindLoginHandlers();
       return;
@@ -369,23 +373,27 @@
 
     if (route.path === "/dashboard") {
       renderDashboard(page);
+      renderTutorialOverlay();
       return;
     }
 
     if (route.path === "/incident") {
       renderIncidentDetail(page, route.params.get("id"));
+      renderTutorialOverlay();
       return;
     }
 
     if (route.path === "/security") {
       destroyMap();
       renderSecurity(page);
+      renderTutorialOverlay();
       return;
     }
 
     if (route.path === "/reports") {
       destroyMap();
       renderReports(page);
+      renderTutorialOverlay();
       return;
     }
 
@@ -475,6 +483,7 @@
 
           <div class="nav-meta">
             <span class="user-pill">${escapeHtml(user.name)} · ${escapeHtml(user.role)}</span>
+            <button type="button" class="tutorial-launch" data-action="open-tutorial">Tutorial</button>
             <button type="button" class="ghost-btn" data-action="logout">Logout</button>
           </div>
         </header>
@@ -482,6 +491,7 @@
         <main id="page" class="page"></main>
       </div>
 
+      <div id="tutorial-root"></div>
       <div id="modal-root"></div>
     `;
   }
@@ -1361,7 +1371,45 @@
     const action = target.getAttribute("data-action");
     const incidentId = target.getAttribute("data-id");
 
+    if (action === "open-tutorial") {
+      openTutorial();
+      return;
+    }
+
+    if (action === "close-tutorial" || action === "tutorial-skip") {
+      closeTutorial();
+      return;
+    }
+
+    if (action === "tutorial-next") {
+      const steps = getTutorialSteps();
+      if (ui.tutorialStep >= steps.length - 1) {
+        closeTutorial();
+      } else {
+        setTutorialStep(ui.tutorialStep + 1);
+      }
+      return;
+    }
+
+    if (action === "tutorial-prev") {
+      setTutorialStep(ui.tutorialStep - 1);
+      return;
+    }
+
+    if (action === "tutorial-jump") {
+      const step = Number(target.getAttribute("data-step"));
+      setTutorialStep(step);
+      return;
+    }
+
+    if (action === "tutorial-route") {
+      const route = target.getAttribute("data-route");
+      if (route) location.hash = route;
+      return;
+    }
+
     if (action === "logout") {
+      closeTutorial();
       saveSession(null);
       ui.autoScenarioRunning = false;
       scenarioTimers.forEach((timer) => clearTimeout(timer));
@@ -1757,6 +1805,190 @@
     const root = document.getElementById("modal-root");
     if (root) root.innerHTML = "";
   }
+
+  function openTutorial(step = 0) {
+    ui.tutorialOpen = true;
+    setTutorialStep(step);
+  }
+
+  function closeTutorial() {
+    ui.tutorialOpen = false;
+    const root = document.getElementById("tutorial-root");
+    if (root) root.innerHTML = "";
+  }
+
+  function setTutorialStep(step) {
+    const steps = getTutorialSteps();
+    if (!steps.length) {
+      closeTutorial();
+      return;
+    }
+
+    const safeStep = Math.max(0, Math.min(steps.length - 1, Number(step)));
+    ui.tutorialOpen = true;
+    ui.tutorialStep = Number.isFinite(safeStep) ? safeStep : 0;
+    renderTutorialOverlay();
+  }
+
+  function getTutorialSteps() {
+    const intro = {
+      title: "Login and Roles",
+      body: "Use awaiz, omar, or anas with password 123. Admin and Operator can dispatch and run demo actions.",
+      chips: ["awaiz: Admin", "omar: Operator", "anas: Viewer"],
+      hint: "Viewer is read-only. Switch to Admin/Operator for full controls.",
+      path: "/dashboard",
+      route: "#/dashboard"
+    };
+
+    const outro = {
+      title: "Fast Workflow",
+      body: "Typical flow: Dashboard triage -> open incident detail -> Security checks -> Reports export.",
+      chips: ["Dashboard", "Incident", "Security", "Reports"],
+      hint: "Use this Tutorial button anytime from the top bar.",
+      path: "/dashboard",
+      route: "#/dashboard"
+    };
+
+    const desktopSteps = [
+      {
+        title: "Desktop Layout",
+        body: "Use the three-panel command zone: Incident Queue on the left, live map center, AI recommendations right.",
+        chips: ["Queue", "Map", "AI Panel", "Top Status"],
+        hint: "Click Focus AI on an incident card to update recommendations instantly.",
+        path: "/dashboard",
+        route: "#/dashboard"
+      },
+      {
+        title: "Dispatch and Monitor",
+        body: "Trigger incident, dispatch drone, then watch telemetry, computer vision, and transcript in the bottom panels.",
+        chips: ["Trigger Incident", "Dispatch", "Telemetry", "Transcript"],
+        hint: "Use Auto-run Scenario for a full simulated response timeline.",
+        path: "/dashboard",
+        route: "#/dashboard"
+      },
+      {
+        title: "Security and Reports",
+        body: "Open Security to inspect API and anomaly signals, then Reports for KPIs, chart, and printable summary.",
+        chips: ["Anomalies", "API Gateway", "KPI Stats", "Print Report"],
+        hint: "These screens are best reviewed on wider laptop viewports.",
+        path: "/security",
+        route: "#/security"
+      }
+    ];
+
+    const mobileSteps = [
+      {
+        title: "Mobile Flow",
+        body: "Scroll vertically through map, queue, AI, and live feeds. The layout is stacked for one-hand monitoring.",
+        chips: ["Map", "Queue", "AI", "Live Feeds"],
+        hint: "Map is prioritized near the top so you can orient first.",
+        path: "/dashboard",
+        route: "#/dashboard"
+      },
+      {
+        title: "Touch Controls",
+        body: "Pinch/drag map to navigate, tap Focus AI on incidents, and use Show full response plan for expanded guidance.",
+        chips: ["Pinch Zoom", "Tap Focus AI", "Expand Plan", "Open Incident"],
+        hint: "Transcript and telemetry are intentionally compact on phone to reduce clutter.",
+        path: "/dashboard",
+        route: "#/dashboard"
+      },
+      {
+        title: "Mobile Review Loop",
+        body: "Use top tabs for Security and Reports, then return to Dashboard to continue dispatch operations.",
+        chips: ["Security Tab", "Reports Tab", "Back to Dashboard"],
+        hint: "Each tab keeps a scroll-friendly single-column structure on mobile.",
+        path: "/reports",
+        route: "#/reports"
+      }
+    ];
+
+    return [intro, ...(isCompactMobile() ? mobileSteps : desktopSteps), outro];
+  }
+
+  function routeLabel(path) {
+    if (path === "/dashboard") return "Dashboard";
+    if (path === "/security") return "Security";
+    if (path === "/reports") return "Reports";
+    if (path === "/incident") return "Incident";
+    return "Dashboard";
+  }
+
+  function renderTutorialOverlay() {
+    const root = document.getElementById("tutorial-root");
+    if (!root) return;
+
+    if (!ui.tutorialOpen) {
+      root.innerHTML = "";
+      return;
+    }
+
+    const steps = getTutorialSteps();
+    if (!steps.length) {
+      root.innerHTML = "";
+      return;
+    }
+
+    const stepIndex = Math.max(0, Math.min(steps.length - 1, ui.tutorialStep));
+    ui.tutorialStep = stepIndex;
+    const step = steps[stepIndex];
+    const currentPath = parseRoute().path;
+    const onStepRoute = !step.path || currentPath === step.path;
+    const deviceLabel = isCompactMobile() ? "Mobile Guided Tutorial" : "Laptop Guided Tutorial";
+
+    root.innerHTML = `
+      <div class="tutorial-overlay" role="dialog" aria-modal="true" aria-label="How to use tutorial">
+        <section class="card tutorial-card">
+          <div class="tutorial-head">
+            <div>
+              <p class="tutorial-kicker">${escapeHtml(deviceLabel)}</p>
+              <h3 class="tutorial-title">Step ${stepIndex + 1} of ${steps.length}: ${escapeHtml(step.title)}</h3>
+            </div>
+            <button type="button" class="ghost-btn" data-action="close-tutorial">Close</button>
+          </div>
+
+          <p class="tutorial-body">${escapeHtml(step.body)}</p>
+
+          <div class="tutorial-visual">
+            ${step.chips.map((chip) => `<span class="tutorial-chip">${escapeHtml(chip)}</span>`).join("")}
+          </div>
+
+          ${step.hint ? `<p class="helper tutorial-hint">${escapeHtml(step.hint)}</p>` : ""}
+
+          <div class="tutorial-route">
+            ${step.route && !onStepRoute
+              ? `<button type="button" class="link-btn" data-action="tutorial-route" data-route="${escapeHtml(step.route)}">Open ${escapeHtml(routeLabel(step.path))}</button>`
+              : `<span class="helper">Current view: ${escapeHtml(routeLabel(currentPath))}</span>`}
+          </div>
+
+          <div class="tutorial-progress">
+            ${steps
+              .map(
+                (item, index) => `
+                  <button
+                    type="button"
+                    class="tutorial-dot ${index === stepIndex ? "active" : ""}"
+                    data-action="tutorial-jump"
+                    data-step="${index}"
+                    aria-label="Go to step ${index + 1}: ${escapeHtml(item.title)}"
+                  ></button>
+                `
+              )
+              .join("")}
+          </div>
+
+          <div class="tutorial-actions">
+            <button type="button" class="ghost-btn" data-action="tutorial-prev" ${stepIndex === 0 ? "disabled" : ""}>Back</button>
+            <div class="tutorial-actions-right">
+              <button type="button" class="ghost-btn" data-action="tutorial-skip">Skip</button>
+              <button type="button" data-action="tutorial-next">${stepIndex === steps.length - 1 ? "Finish" : "Next"}</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
   function setPumpPressure(incidentId, pressure) {
     const incident = findIncident(incidentId);
     if (!incident) return;
