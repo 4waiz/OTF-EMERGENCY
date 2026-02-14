@@ -374,6 +374,7 @@
     app.innerHTML = renderShell(route.path);
     const page = document.getElementById("page");
     if (!page) return;
+    page.className = `page route-${(route.path || "/dashboard").replace("/", "") || "dashboard"}`;
 
     if (route.path === "/dashboard") {
       renderDashboard(page);
@@ -405,21 +406,18 @@
       <section class="login-wrap">
         <form class="card login-card" id="login-form" autocomplete="off">
           <h2>OTF Emergency Control</h2>
-          <p class="helper">Secure neon command console demo</p>
 
           <label class="login-row" for="login-username">
             <span>Username</span>
-            <input id="login-username" name="username" placeholder="awaiz / omar / anas" required />
+            <input id="login-username" name="username" required />
           </label>
 
           <label class="login-row" for="login-password">
             <span>Password</span>
-            <input id="login-password" name="password" type="password" placeholder="123" required />
+            <input id="login-password" name="password" type="password" required />
           </label>
 
           <p id="login-error" class="error-msg hidden" aria-live="polite"></p>
-
-          <p class="helper">Focus areas: Cybersecurity & Critical Infrastructure Protection, Environmental Monitoring & Disaster Management.</p>
 
           <div class="login-actions">
             <button type="submit">Login</button>
@@ -550,7 +548,7 @@
         </article>
       </section>
 
-      <details class="demo-panel" open>
+      <details class="demo-panel">
         <summary>Demo Controls</summary>
         <div class="demo-grid">
           <label>
