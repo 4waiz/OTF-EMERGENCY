@@ -10,6 +10,7 @@
   const BACKUP_INTERVAL_MS = 12 * 60 * 60 * 1000;
   const TICK_INTERVAL_MS = 1000;
   const BASE_COORDS = { lat: 8.9806, lng: 38.7578 };
+  const MOBILE_BREAKPOINT_PX = 760;
 
   const PASSWORD = "123";
   const IDENTITY = {
@@ -127,7 +128,8 @@
   let ui = {
     incidentFilter: "All",
     selectedIncidentId: state.incidents[0] ? state.incidents[0].id : null,
-    autoScenarioRunning: false
+    autoScenarioRunning: false,
+    aiPlanExpanded: false
   };
 
   let mapState = {
@@ -143,9 +145,13 @@
   init();
 
   function init() {
+    clearClientPersistence();
     window.addEventListener("hashchange", renderRoute);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("pagehide", onPageHide);
     document.addEventListener("click", onGlobalClick);
     document.addEventListener("change", onGlobalChange);
+    document.addEventListener("toggle", onGlobalToggle, true);
 
     if (!location.hash) {
       location.hash = state.session ? "#/dashboard" : "#/login";
@@ -153,6 +159,43 @@
 
     startTicker();
     renderRoute();
+  }
+
+  function clearClientPersistence() {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.data);
+      localStorage.removeItem(STORAGE_KEYS.session);
+    } catch (_error) {
+      // Ignore storage access failures in restricted browsing modes.
+    }
+
+    try {
+      sessionStorage.clear();
+    } catch (_error) {
+      // Ignore storage access failures in restricted browsing modes.
+    }
+
+    clearCookies();
+  }
+
+  function clearCookies() {
+    if (typeof document === "undefined") return;
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    cookies.forEach((entry) => {
+      const key = entry.split("=")[0].trim();
+      if (!key) return;
+      document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+    });
+  }
+
+  function onPageHide() {
+    saveSession(null);
+  }
+
+  function onPageShow(event) {
+    if (event && event.persisted) {
+      location.reload();
+    }
   }
 
   function defaultState() {
@@ -281,67 +324,15 @@
   }
 
   function loadState() {
-    const fallback = defaultState();
-    let saved = null;
-
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.data);
-      saved = raw ? JSON.parse(raw) : null;
-    } catch (_error) {
-      saved = null;
-    }
-
-    let session = null;
-    try {
-      const rawSession = localStorage.getItem(STORAGE_KEYS.session);
-      session = rawSession ? JSON.parse(rawSession) : null;
-    } catch (_error) {
-      session = null;
-    }
-
-    return {
-      ...fallback,
-      ...(saved || {}),
-      users: USERS,
-      drones: Array.isArray(saved && saved.drones) ? saved.drones : fallback.drones,
-      incidents: Array.isArray(saved && saved.incidents) ? saved.incidents : fallback.incidents,
-      logs: Array.isArray(saved && saved.logs) ? saved.logs : fallback.logs,
-      anomalies: Array.isArray(saved && saved.anomalies) ? saved.anomalies : fallback.anomalies,
-      apiGateway: {
-        ...fallback.apiGateway,
-        ...((saved && saved.apiGateway) || {})
-      },
-      demoFlags: {
-        ...fallback.demoFlags,
-        ...((saved && saved.demoFlags) || {})
-      },
-      session
-    };
+    return defaultState();
   }
 
   function persistState() {
-    localStorage.setItem(
-      STORAGE_KEYS.data,
-      JSON.stringify({
-        users: USERS,
-        drones: state.drones,
-        incidents: state.incidents,
-        logs: state.logs,
-        apiGateway: state.apiGateway,
-        anomalies: state.anomalies,
-        backupCycleStart: state.backupCycleStart,
-        demoFlags: state.demoFlags
-      })
-    );
+    // Intentionally disabled: app runs stateless for privacy.
   }
 
   function saveSession(session) {
     state.session = session;
-    if (session) {
-      localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.session);
-    }
   }
 
   function parseRoute() {
@@ -618,14 +609,20 @@
     const openAnomalies = state.anomalies.filter((item) => item.status === "Open").length;
     const networkStable = !state.demoFlags.networkDegraded;
     const connected = state.drones.filter((drone) => drone.status !== "Disconnected").length;
+    const items = [
+      { label: "System health", value: openAnomalies > 0 ? "Monitor" : "Nominal", level: openAnomalies > 0 ? "warn" : "ok" },
+      { label: "Encryption", value: "ON", level: "ok" },
+      { label: "Backup countdown", value: formatDuration(getBackupCountdownMs()), level: "ok" },
+      { label: "Network", value: networkStable ? "Stable" : "Degraded", level: networkStable ? "ok" : "warn" },
+      { label: "Connected drones", value: `${connected}/${state.drones.length}`, level: connected < state.drones.length ? "bad" : "ok" }
+    ];
+    const visibleItems = isCompactMobile()
+      ? items.filter((item) => ["System health", "Network", "Connected drones"].includes(item.label))
+      : items;
 
-    container.innerHTML = [
-      statusTile("System health", openAnomalies > 0 ? "Monitor" : "Nominal", openAnomalies > 0 ? "warn" : "ok"),
-      statusTile("Encryption", "ON", "ok"),
-      statusTile("Backup countdown", formatDuration(getBackupCountdownMs()), "ok"),
-      statusTile("Network", networkStable ? "Stable" : "Degraded", networkStable ? "ok" : "warn"),
-      statusTile("Connected drones", `${connected}/${state.drones.length}`, connected < state.drones.length ? "bad" : "ok")
-    ].join("");
+    container.innerHTML = visibleItems
+      .map((item) => statusTile(item.label, item.value, item.level))
+      .join("");
   }
 
   function statusTile(label, value, level) {
@@ -645,13 +642,15 @@
     const list = state.incidents
       .filter((incident) => (ui.incidentFilter === "All" ? true : incident.type === ui.incidentFilter))
       .sort((a, b) => (SEVERITY_SCORE[b.severity] - SEVERITY_SCORE[a.severity]) || (b.createdAt - a.createdAt));
+    const compact = isCompactMobile();
+    const visibleList = compact ? list.slice(0, 2) : list;
 
-    if (!list.length) {
+    if (!visibleList.length) {
       container.innerHTML = `<div class="empty-state">No incidents in queue for the selected type.</div>`;
       return;
     }
 
-    container.innerHTML = list
+    container.innerHTML = visibleList
       .map((incident) => {
         const dispatchEnabled = canOperate() && !incident.assignedDroneId && incident.status !== "Resolved";
         const createdAt = escapeHtml(formatDateTime(incident.createdAt));
@@ -681,7 +680,8 @@
           </article>
         `;
       })
-      .join("");
+      .join("")
+      + (compact && list.length > visibleList.length ? `<p class="helper compact-note">Showing top ${visibleList.length} incidents by priority.</p>` : "");
   }
 
   function renderAiPanel() {
@@ -730,7 +730,7 @@
         ${checklist.slice(0, 2).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
 
-      <details class="ai-more">
+      <details class="ai-more" ${ui.aiPlanExpanded ? "open" : ""}>
         <summary>Show full response plan</summary>
         <div class="plan-box">
           <p class="helper">Checklist</p>
@@ -759,7 +759,10 @@
       return;
     }
 
-    container.innerHTML = state.drones
+    const compact = isCompactMobile();
+    const drones = compact ? state.drones.slice(0, 1) : state.drones;
+
+    container.innerHTML = drones
       .map((drone) => {
         return `
           <div class="telemetry-item">
@@ -772,7 +775,8 @@
           </div>
         `;
       })
-      .join("");
+      .join("")
+      + (compact && state.drones.length > drones.length ? '<p class="helper compact-note">Showing primary drone. Open incident for full fleet telemetry.</p>' : "");
   }
 
   function renderMeter(label, value, max, unit, fillClass) {
@@ -790,7 +794,7 @@
     if (!container) return;
 
     const incident = getPrimaryIncident();
-    const hits = incident ? incident.peopleRecognized.slice(-4).reverse() : [];
+    const hits = incident ? incident.peopleRecognized.slice(-(isCompactMobile() ? 2 : 4)).reverse() : [];
     const motion = state.demoFlags.motionDetected || state.drones.some((drone) => drone.sensors.motion);
 
     container.innerHTML = `
@@ -827,10 +831,11 @@
       return;
     }
 
+    const maxLines = isCompactMobile() ? 3 : 5;
     container.innerHTML = `
       <div class="scroll-list">
         ${incident.transcript
-          .slice(-5)
+          .slice(-maxLines)
           .reverse()
           .map(
             (line) => `
@@ -1549,6 +1554,12 @@
     refreshCurrentRoute();
   }
 
+  function onGlobalToggle(event) {
+    const details = event.target;
+    if (!(details instanceof HTMLElement) || !details.matches("details.ai-more")) return;
+    ui.aiPlanExpanded = details.open;
+  }
+
   function createIncident(type, severity) {
     const id = generateIncidentId();
     const lat = BASE_COORDS.lat + (Math.random() - 0.5) * 0.045;
@@ -2144,6 +2155,12 @@
 
   function isViewer() {
     return currentUser().role === "Viewer";
+  }
+
+  function isCompactMobile() {
+    return typeof window !== "undefined"
+      && !!window.matchMedia
+      && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX}px)`).matches;
   }
 
   function randomItem(list) {

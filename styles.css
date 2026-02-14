@@ -37,6 +37,10 @@ body {
   overflow: hidden;
 }
 
+html {
+  background: #06050d;
+}
+
 #app {
   height: 100dvh;
   overflow: hidden;
@@ -48,6 +52,7 @@ body {
   line-height: 1.52;
   letter-spacing: 0.005em;
   color: var(--text);
+  background-color: #06050d;
   background:
     radial-gradient(circle at 12% 16%, rgba(255, 92, 214, 0.15), transparent 34%),
     radial-gradient(circle at 86% 0%, rgba(58, 232, 255, 0.14), transparent 30%),
@@ -1101,6 +1106,10 @@ main {
   color: var(--muted);
 }
 
+.compact-note {
+  margin-top: 0.56rem;
+}
+
 .sr-only {
   border: 0;
   clip: rect(0 0 0 0);
@@ -1187,6 +1196,18 @@ main {
     height: auto;
     min-height: 100%;
     overflow: auto;
+  }
+
+  html,
+  body,
+  #app,
+  .app-shell,
+  main,
+  .page {
+    background:
+      radial-gradient(circle at 15% 10%, rgba(255, 92, 214, 0.12), transparent 40%),
+      radial-gradient(circle at 92% 0%, rgba(58, 232, 255, 0.12), transparent 36%),
+      linear-gradient(160deg, #070611 0%, #0b0919 58%, #100d24 100%);
   }
 
   #app,
@@ -1302,6 +1323,7 @@ main {
 
   .card {
     padding: 0.66rem;
+    background: rgba(19, 16, 40, 0.88);
   }
 
   .panel-title {
@@ -1318,7 +1340,7 @@ main {
   }
 
   .status-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.44rem;
   }
 
@@ -1342,6 +1364,13 @@ main {
   .bottom-grid .panel-title {
     font-size: 0.88rem;
     margin-bottom: 0.5rem;
+  }
+
+  .telemetry-item,
+  .log-line,
+  .status-item,
+  .incident-card {
+    background: rgba(26, 22, 54, 0.82);
   }
 
   .helper,
