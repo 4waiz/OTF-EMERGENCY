@@ -1182,7 +1182,28 @@ main {
 }
 
 @media (max-width: 760px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  #app,
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .app-shell {
+    grid-template-rows: auto auto;
+  }
+
   main {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
     padding: 0.5rem;
   }
 
@@ -1225,19 +1246,58 @@ main {
   }
 
   .page.route-dashboard {
-    grid-template-rows: auto minmax(0, 1fr) minmax(108px, 0.56fr) auto;
+    grid-template-rows: auto;
+    align-content: start;
+  }
+
+  .page.route-incident,
+  .page.route-security,
+  .page.route-reports {
+    grid-template-rows: auto;
+  }
+
+  .page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    gap: 0.56rem;
   }
 
   .dashboard-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto;
+    gap: 0.56rem;
+  }
+
+  .map-panel {
+    order: 1;
+    min-height: clamp(290px, 56vh, 430px);
+  }
+
+  .incident-panel {
+    order: 2;
+  }
+
+  .ai-panel {
+    order: 3;
   }
 
   .incident-panel,
   .map-panel,
   .ai-panel {
+    height: auto;
+    min-height: 0;
     grid-column: auto;
     grid-row: auto;
+  }
+
+  #map {
+    min-height: clamp(255px, 48vh, 360px);
+  }
+
+  .incident-list {
+    flex: initial;
+    max-height: 40vh;
   }
 
   .card {
@@ -1250,7 +1310,7 @@ main {
   }
 
   .demo-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .kpi-grid {
@@ -1271,13 +1331,17 @@ main {
   }
 
   .bottom-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.48rem;
+    grid-template-columns: 1fr;
+    gap: 0.56rem;
+  }
+
+  .bottom-grid > .card > div {
+    max-height: 34vh;
   }
 
   .bottom-grid .panel-title {
-    font-size: 0.78rem;
-    margin-bottom: 0.38rem;
+    font-size: 0.88rem;
+    margin-bottom: 0.5rem;
   }
 
   .helper,
@@ -1295,7 +1359,7 @@ main {
   }
 }
 
-@media (max-height: 760px) {
+@media (max-height: 760px) and (min-width: 761px) {
   .top-nav {
     padding-top: 0.48rem;
     padding-bottom: 0.48rem;
