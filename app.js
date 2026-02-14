@@ -654,18 +654,23 @@
     container.innerHTML = list
       .map((incident) => {
         const dispatchEnabled = canOperate() && !incident.assignedDroneId && incident.status !== "Resolved";
+        const createdAt = escapeHtml(formatDateTime(incident.createdAt));
+        const locationName = escapeHtml(incident.locationName);
+        const assignedDrone = escapeHtml(incident.assignedDroneId || "No drone assigned");
+        const status = escapeHtml(incident.status);
         return `
           <article class="incident-card incident-sev-${severityKey(incident.severity)}">
             <header>
-              <span class="incident-type">${escapeHtml(incident.type)}</span>
+              <div class="incident-headline">
+                <span class="incident-type">${escapeHtml(incident.type)}</span>
+                <span class="incident-id">${escapeHtml(incident.id)}</span>
+              </div>
               <span class="badge badge-${severityKey(incident.severity)}">${escapeHtml(incident.severity)}</span>
             </header>
 
-            <div class="incident-meta">
-              <span>Location: ${escapeHtml(incident.locationName)}</span>
-              <span>Time: ${formatDateTime(incident.createdAt)}</span>
-              <span>Assigned drone: ${escapeHtml(incident.assignedDroneId || "Unassigned")}</span>
-              <span>Status: ${escapeHtml(incident.status)}</span>
+            <div class="incident-meta incident-meta-compact">
+              <span>${locationName} · ${createdAt}</span>
+              <span>${assignedDrone} · ${status}</span>
             </div>
 
             <div class="action-row">
@@ -691,6 +696,7 @@
 
     const playbook = AI_PLAYBOOK[incident.type] || AI_PLAYBOOK["Medical Emergency"];
     const checklist = [...playbook.checklist];
+    const tone = playbook.tone.replace(/^Fast recommendation according to situation:\s*/i, "");
 
     if (state.demoFlags.networkDegraded) {
       checklist.push("Switch command link to fallback mesh and confirm encryption handshake.");
@@ -706,22 +712,38 @@
     const eta = estimateEtaMinutes(assignedDrone, incident);
 
     container.innerHTML = `
-      <p class="tone">${escapeHtml(playbook.tone)}</p>
+      <p class="tone"><strong>Priority:</strong> ${escapeHtml(tone)}</p>
 
-      <ul class="ai-list">
-        ${checklist.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      <div class="ai-summary-grid">
+        <div class="summary-pill">
+          <span>Route ETA</span>
+          <strong>${eta}</strong>
+        </div>
+        <div class="summary-pill">
+          <span>Responders</span>
+          <strong>${escapeHtml(playbook.responders.join(", "))}</strong>
+        </div>
+      </div>
+
+      <p class="helper">Immediate actions</p>
+      <ul class="ai-list ai-list-compact">
+        ${checklist.slice(0, 2).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
 
-      <div class="plan-box">
-        <strong>Dispatch plan</strong>
-        <div class="kv"><span>Route ETA</span><span>${eta}</span></div>
-        <div class="kv"><span>Suggested responders</span><span>${escapeHtml(playbook.responders.join(", "))}</span></div>
+      <details class="ai-more">
+        <summary>Show full response plan</summary>
+        <div class="plan-box">
+          <p class="helper">Checklist</p>
+          <ul class="ai-list">
+            ${checklist.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
 
-        <p class="helper">Next 3 actions</p>
-        <ol class="actions-list">
-          ${playbook.nextActions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-        </ol>
-      </div>
+          <p class="helper">Next 3 actions</p>
+          <ol class="actions-list">
+            ${playbook.nextActions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ol>
+        </div>
+      </details>
 
       <div class="action-row">
         <a class="nav-link" href="#/incident?id=${incident.id}">Open ${incident.id}</a>
@@ -808,7 +830,7 @@
     container.innerHTML = `
       <div class="scroll-list">
         ${incident.transcript
-          .slice(-8)
+          .slice(-5)
           .reverse()
           .map(
             (line) => `
